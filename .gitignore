@@ -1,0 +1,28 @@
+# Credenciales
+key.json
+
+# Datos descargados 
+tif/
+results/
+grassdata/
+manifests/
+logs/
+
+# R
+.Rhistory
+.Rproj.user/
+.Rdata
+
+# macOS
+.DS_Store
+
+# Paso 07 (fuego)
+07_fire_age.js
+07_fire_frequency.js
+
+# Docs internos — no publicar
+REPORTE_METODOLOGIA.md
+PIPELINE.md
+
+# Docker build log
+docker/build.log
