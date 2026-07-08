@@ -1,4 +1,4 @@
-# MapBiomas Colombia — Pipeline de Degradación
+# MapBiomas Colombia — Módulo de Degradación
 **Colección 3 · Años 1985–2024**
 
 | | |
@@ -10,7 +10,7 @@
 | **Imagen Docker** | `degradacion-r-steps:latest` |
 | **Vector de regiones** | `./gis/region_vector_buffer.geojson` (campo `id_regionC`, 155 regiones) |
 
-Este README explica **cómo correr cada script** del pipeline. Para el detalle
+Este README explica **cómo correr cada script** del módulo. Para el detalle
 completo de la parte Docker (build de la imagen, service account, watchdog de
 disco, RStudio interactivo) ver [`docker/README.md`](docker/README.md).
 
@@ -35,7 +35,7 @@ flowchart TD
 
 ## Dos entornos de ejecución
 
-El pipeline alterna entre dos entornos según el paso:
+El módulo alterna entre dos entornos según el paso:
 
 | Entorno | Scripts | Cómo se corren |
 |---|---|---|
@@ -72,23 +72,22 @@ docker build -t degradacion-r-steps docker/grass-r 2>&1 | tee docker/build.log
 (este comando es idéntico en los dos — `tee` funciona igual en PowerShell)
 
 > ⚠️ En los pasos de abajo, la única diferencia entre Mac/Linux y Windows es
-> `"$(pwd)":/work` (Mac/Linux) vs `"${PWD}:/work"` (Windows). Si copias el
-> comando equivocado para tu sistema vas a ver el error
-> `docker: invalid reference format`.
+> `"$(pwd)":/work` (Mac/Linux) vs `"${PWD}:/work"` (Windows). Usar el comando
+> del sistema equivocado produce el error `docker: invalid reference format`.
 
 ---
 
 ## 🖥️ Alternativa sin terminal: workflow completo desde RStudio
 
-**¿No querés lidiar con `docker run`, PowerShell, ni `$(pwd)` vs `${PWD}`?**
-Los cuatro scripts `.R` (03A, 03B, 04A, 04B) se pueden correr enteros desde
-una interfaz gráfica en el navegador, sin escribir un solo comando Docker
-después de este paso. Recomendado si el problema es justo la terminal (como
-pasó armando esto: errores de carpeta, `invalid reference format`, CLI de
-`gcloud` sin instalar, etc.) — RStudio evita todo eso de una.
+**Para quien prefiere no lidiar con `docker run`, PowerShell, ni `$(pwd)` vs
+`${PWD}`**: los cuatro scripts `.R` (03A, 03B, 04A, 04B) se pueden correr
+enteros desde una interfaz gráfica en el navegador, sin escribir un solo
+comando Docker después de este paso. Recomendado si el problema es justo la
+terminal (errores de carpeta, `invalid reference format`, CLI de `gcloud`
+sin instalar, etc.) — RStudio evita todo eso de una.
 
-(requiere haber hecho el `docker build` del paso anterior — si ya corriste
-ese comando, no hace falta repetirlo)
+(requiere haber hecho el `docker build` del paso anterior — si ese comando
+ya se corrió, no hace falta repetirlo)
 
 1. Levantar el contenedor de RStudio — copiar el comando tal cual, sin
    cambiar nada (`mb-degradacion` ya es la contraseña, no hace falta
@@ -143,7 +142,7 @@ workflow.
 ## Cómo correr cada paso
 
 Cada paso indica su entorno entre paréntesis. Los pasos en GEE se corren en
-el Code Editor (ver tabla de arriba); 03A/03B/04A/04B usan Docker por
+el Code Editor (ver tabla de arriba); 03A/03B/04A/04B usan Docker desde la
 terminal — alternativa a la sección de RStudio de más arriba.
 
 ### 01 — Efecto de borde (GEE)
