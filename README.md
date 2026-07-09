@@ -1,64 +1,67 @@
-# MapBiomas Colombia — Módulo de Degradación
-**Colección 3 · Años 1985–2024**
+# MapBiomas Colombia — Degradation Module
+**Collection 3 · Years 1985–2024**
+
+*[Versión en español](README.es.md)*
 
 | | |
 |---|---|
-| **Proyecto GEE** | `mapbiomas-colombia` |
-| **Proyecto GCS** | `cloud-ee-lmedinaj` |
-| **Bucket GCS** | `gs://mbcolombia-degradacion/AUXILIARES/DEGRADACION/COL_3/` |
-| **Raíz de assets GEE** | `projects/mapbiomas-colombia/assets/DEGRADACION/COLECCION1/BETA/PROCESS/` |
-| **Imagen Docker** | `degradacion-r-steps:latest` |
-| **Vector de regiones** | `./gis/region_vector_buffer.geojson` (campo `id_regionC`, 155 regiones) |
+| **GEE Project** | `mapbiomas-colombia` |
+| **GCS Project** | `cloud-ee-lmedinaj` |
+| **GCS Bucket** | `gs://mbcolombia-degradacion/AUXILIARES/DEGRADACION/COL_3/` |
+| **GEE Assets Root** | `projects/mapbiomas-colombia/assets/DEGRADACION/COLECCION1/BETA/PROCESS/` |
+| **Docker Image** | `degradacion-r-steps:latest` |
+| **Region Vector** | `./gis/region_vector_buffer.geojson` (field `id_regionC`, 155 regions) |
 
-Este README explica **cómo correr cada script** del módulo. Para el detalle
-completo de la parte Docker (build de la imagen, service account, watchdog de
-disco, RStudio interactivo) ver [`docker/README.md`](docker/README.md).
+This README explains **how to run each script** in the module. For full
+details on the Docker side (building the image, service account, disk
+watchdog, interactive RStudio) see [`docker/README.md`](docker/README.md).
 
 ---
 
-## Flujo
+## Flow
 
 ```mermaid
 flowchart TD
     LULC["MapBiomas Col3 (LULC)"]
 
-    LULC --> S01["01 · Efecto de Borde"]
-    LULC --> S02["02 · Máscara Nativa"]
-    LULC --> S06["06 · Veg. Secundaria"]
+    LULC --> S01["01 · Edge Effect"]
+    LULC --> S02["02 · Native Mask"]
+    LULC --> S06["06 · Secondary Veg."]
 
     S02 --> S03["03 · Patch ID & Size"]
-    S02 --> S04["04 · Morfología"]
-    S02 --> S05["05 · Aislamiento"]
+    S02 --> S04["04 · Morphology"]
+    S02 --> S05["05 · Isolation"]
 ```
 
 ---
 
-## Dos entornos de ejecución
+## Two execution environments
 
-El módulo alterna entre dos entornos según el paso:
+The module alternates between two environments depending on the step:
 
-| Entorno | Scripts | Cómo se corren |
+| Environment | Scripts | How to run |
 |---|---|---|
-| **GEE Code Editor** (`.js`) | `01A, 01B, 02A, 02B, 03C, 04C, 05A–05D, 06` | Pegar el contenido del archivo en [code.earthengine.google.com](https://code.earthengine.google.com/), ajustar los parámetros al inicio del script, click **Run**, y para las exportaciones ir a la pestaña **Tasks** y correr cada `Export.image.toAsset(...)` generado |
-| **Docker (GRASS + R)** (`.R`) | `03A, 03B, 04A, 04B` | `docker run` montando el repo como volumen — ver §Docker más abajo |
+| **GEE Code Editor** (`.js`) | `01A, 01B, 02A, 02B, 03C, 04C, 05A–05D, 06` | Paste the file contents into [code.earthengine.google.com](https://code.earthengine.google.com/), adjust the parameters at the top of the script, click **Run**, and for exports go to the **Tasks** tab and run each generated `Export.image.toAsset(...)` |
+| **Docker (GRASS + R)** (`.R`) | `03A, 03B, 04A, 04B` | `docker run` mounting the repo as a volume — see "Docker — quick setup" below |
 
 ---
 
-## Docker — setup rápido
+## Docker — quick setup
 
-Antes que nada: **abrir una terminal DENTRO de la carpeta `colombia-degradation/`**
-(la que tiene este archivo, `docker/`, `scripts/`, etc.) — todos los comandos de
-abajo se corren desde ahí. Colocar el service account key una vez (ver
-`docker/README.md` §1) como `colombia-degradation/key.json` (no commitear).
+First: **open a terminal INSIDE the `colombia-degradation/` folder**
+(the one with this file, `docker/`, `scripts/`, etc.) — all commands
+below are run from there. Place the service account key once (see
+the "1. Service account" section of `docker/README.md`) as
+`colombia-degradation/key.json` (do not commit).
 
-Cada bloque de comandos de este README tiene dos versiones — copiar y pegar
-la que corresponda a tu sistema, **sin mezclar las dos**:
+Every command block in this README has two versions — copy and paste
+the one for your system, **without mixing the two**:
 
-- **Mac / Linux / WSL2** → terminal normal (bash/zsh)
-- **Windows** → PowerShell (la terminal que abre por defecto en Windows;
-  **no funciona en el `cmd.exe` viejo**)
+- **Mac / Linux / WSL2** → normal terminal (bash/zsh)
+- **Windows** → PowerShell (the terminal that opens by default on Windows;
+  **does not work in the old `cmd.exe`**)
 
-Construir la imagen (una vez; tarda varios minutos la primera vez):
+Build the image (once; takes several minutes the first time):
 
 Mac / Linux / WSL2:
 ```bash
@@ -69,30 +72,30 @@ Windows (PowerShell):
 ```powershell
 docker build -t degradacion-r-steps docker/grass-r 2>&1 | tee docker/build.log
 ```
-(este comando es idéntico en los dos — `tee` funciona igual en PowerShell)
+(this command is identical on both — `tee` works the same in PowerShell)
 
-> ⚠️ En los pasos de abajo, la única diferencia entre Mac/Linux y Windows es
-> `"$(pwd)":/work` (Mac/Linux) vs `"${PWD}:/work"` (Windows). Usar el comando
-> del sistema equivocado produce el error `docker: invalid reference format`.
+> ⚠️ In the steps below, the only difference between Mac/Linux and Windows is
+> `"$(pwd)":/work` (Mac/Linux) vs `"${PWD}:/work"` (Windows). Using the wrong
+> system's command produces the error `docker: invalid reference format`.
 
 ---
 
-## 🖥️ Alternativa sin terminal: workflow completo desde RStudio
+## 🖥️ Terminal-free alternative: full workflow from RStudio
 
-**Para quien prefiere no lidiar con `docker run`, PowerShell, ni `$(pwd)` vs
-`${PWD}`**: los cuatro scripts `.R` (03A, 03B, 04A, 04B) se pueden correr
-enteros desde una interfaz gráfica en el navegador, sin escribir un solo
-comando Docker después de este paso. Recomendado si el problema es justo la
-terminal (errores de carpeta, `invalid reference format`, CLI de `gcloud`
-sin instalar, etc.) — RStudio evita todo eso de una.
+**For those who prefer not to deal with `docker run`, PowerShell, or `$(pwd)`
+vs `${PWD}`**: the four `.R` scripts (03A, 03B, 04A, 04B) can be run
+entirely from a browser-based GUI, without typing a single Docker command
+after this step. Recommended if the terminal itself is the problem (folder
+errors, `invalid reference format`, `gcloud` CLI not installed, etc.) —
+RStudio avoids all of that at once.
 
-(requiere haber hecho el `docker build` del paso anterior — si ese comando
-ya se corrió, no hace falta repetirlo)
+(requires having done the `docker build` from the previous step — if that
+command already ran, no need to repeat it)
 
-1. Levantar el contenedor de RStudio — copiar el comando tal cual, sin
-   cambiar nada (`mb-degradacion` ya es la contraseña, no hace falta
-   editarla). Este comando abre el navegador solo, apenas el servidor está
-   listo:
+1. Start the RStudio container — copy the command as-is, without
+   changing anything (`mb-degradacion` is already the password, no need
+   to edit it). This command opens the browser on its own, as soon as the
+   server is ready:
 
    Mac / Linux / WSL2:
    ```bash
@@ -105,64 +108,66 @@ ya se corrió, no hace falta repetirlo)
    Start-Job { Start-Sleep -Seconds 3; Start-Process http://localhost:8787 } | Out-Null
    docker run --rm --name rstudio_colombia -p 8787:8787 -e PASSWORD=mb-degradacion -v "${PWD}:/home/rstudio/work" --entrypoint /init degradacion-r-steps
    ```
-2. Si el navegador no abre solo, esperar unos segundos y entrar manualmente
-   a `http://localhost:8787`. Iniciar sesión con:
-   - **Usuario:** `rstudio`
-   - **Contraseña:** `mb-degradacion`
+2. If the browser doesn't open on its own, wait a few seconds and go to
+   `http://localhost:8787` manually. Log in with:
+   - **User:** `rstudio`
+   - **Password:** `mb-degradacion`
 
-   **Para cerrar RStudio**: cerrar esta ventana de terminal, o volver a ella
-   y apretar `Ctrl+C`. Cerrar solo la pestaña del navegador **no** lo apaga
-   — el navegador es apenas una ventana hacia el contenedor, que sigue
-   corriendo hasta que se cierra la terminal.
+   **To close RStudio**: close this terminal window, or go back to it
+   and press `Ctrl+C`. Closing just the browser tab **does not** shut it
+   down — the browser is just a window into the container, which keeps
+   running until the terminal is closed.
 
-   La sesión arranca directo en `~/work` (vía `Rprofile.site`); si algún
-   script no encuentra `./tif/...` o `key.json`, correr `setwd("~/work")`
-   una vez en la consola.
-3. En el panel **Files**, `work/` es todo el proyecto montado en vivo — lo
-   que se edite ahí se guarda directo en disco, sin reconstruir la imagen.
-4. Para cada script: abrir el archivo → editar `years_list` /
-   `region_id_default` al inicio → clic en **Source** (arriba a la derecha
-   del editor), en este orden:
-   - **03A** — editar `years_list` → Source → salidas en `results/03A/`
-   - **03B** — editar `years_list` / `upload_outputs` → Source → sube a GCS
-     e ingesta en GEE (`03_patch-id/`, `03_patch-size-all/`)
-   - **04A** — editar `region_id_default` / `years_list` → Source → salidas
-     en `results/04A/`
-   - **04B** — mismo `region_id_default` que 04A, editar `years_list` →
-     Source → ingesta en GEE (`04_morphology/`)
+   The session starts directly in `~/work` (via `Rprofile.site`); if a
+   script can't find `./tif/...` or `key.json`, run `setwd("~/work")`
+   once in the console.
+3. In the **Files** panel, `work/` is the whole project mounted live —
+   whatever you edit there is saved directly to disk, no need to rebuild
+   the image.
+4. For each script: open the file → edit `years_list` /
+   `region_id_default` at the top → click **Source** (top right of the
+   editor), in this order:
+   - **03A** — edit `years_list` → Source → output in `results/03A/`
+   - **03B** — edit `years_list` / `upload_outputs` → Source → uploads to
+     GCS and ingests into GEE (`03_patch-id/`, `03_patch-size-all/`)
+   - **04A** — edit `region_id_default` / `years_list` → Source → output
+     in `results/04A/`
+   - **04B** — same `region_id_default` as 04A, edit `years_list` →
+     Source → ingests into GEE (`04_morphology/`)
 
-⚠️ Source corre todo secuencialmente en un solo proceso R — no tiene el pool
-paralelo de `run_03A.sh` ni el watchdog de disco de `run_morph.sh`. Para
-lotes grandes en paralelo o con watchdog, usar esos wrappers (sección
-siguiente) o ver `docker/README.md` §3 para el detalle completo de este
-workflow.
+⚠️ Source runs everything sequentially in a single R process — it doesn't
+have the parallel pool from `run_03A.sh` nor the disk watchdog from
+`run_morph.sh`. For large parallel batches or with watchdog, use those
+wrappers (next section) or see the "3. RStudio workflow" section of
+`docker/README.md` for the full detail of this workflow.
 
 ---
 
-## Cómo correr cada paso
+## How to run each step
 
-Cada paso indica su entorno entre paréntesis. Los pasos en GEE se corren en
-el Code Editor (ver tabla de arriba); 03A/03B/04A/04B usan Docker desde la
-terminal — alternativa a la sección de RStudio de más arriba.
+Each step indicates its environment in parentheses. GEE steps run in
+the Code Editor (see table above); 03A/03B/04A/04B use Docker from the
+terminal — an alternative to the RStudio section above.
 
-### 01 — Efecto de borde (GEE)
+### 01 — Edge effect (GEE)
 ```
-01A_fragmentation_edgeArea_v2.js   → editar params.region / years_list → Run → Tasks
-01B_fragmentation_edgeAge_v2.js    → editar params.region / years → Run → Tasks
+01A_fragmentation_edgeArea_v2.js   → edit params.region / years_list → Run → Tasks
+01B_fragmentation_edgeAge_v2.js    → edit params.region / years → Run → Tasks
 ```
-Salida: `01_edge_area/EDGE-AREA-RRRR-YYYY-V`, `01_edge_age/EDGE-AGE-RRRR-YYYY-V`
+Output: `01_edge_area/EDGE-AREA-RRRR-YYYY-V`, `01_edge_age/EDGE-AGE-RRRR-YYYY-V`
 
-### 02 — Máscara nativa (GEE)
+### 02 — Native mask (GEE)
 ```
-02A_utils_nativeMask.js       → Run → Tasks (genera native_mask/nativeMask_col3_v1)
-02B_utils_exportToBucket.js   → fijar exportTarget ('gcs'/'drive') → Run → Tasks
+02A_utils_nativeMask.js       → Run → Tasks (generates native_mask/nativeMask_col3_v1)
+02B_utils_exportToBucket.js   → set exportTarget ('gcs'/'drive') → Run → Tasks
 ```
-`02C_utils_mosaicTIFF.ipynb` y `02D_utils_ingestTIFF.R` **no se usan** en
-Colombia (un TIF/año ya sale de 02B; 03A lee directo de GCS).
+`02C_utils_mosaicTIFF.ipynb` and `02D_utils_ingestTIFF.R` **are not used**
+for Colombia (one TIF/year already comes out of 02B; 03A reads directly
+from GCS).
 
 ### 03 — Patch ID & Size (Docker + GEE)
 
-**03A — un año suelto:**
+**03A — a single year:**
 
 Mac / Linux / WSL2:
 ```bash
@@ -173,14 +178,14 @@ Windows (PowerShell):
 docker run --rm -v "${PWD}:/work" degradacion-r-steps 03A_fragmentation_id_size.R 1985
 ```
 
-**03A — varios años en paralelo** (pool de contenedores, recomendado — requiere
-**Mac / Linux / WSL2 / Git Bash**, no corre en PowerShell nativo):
+**03A — several years in parallel** (container pool, recommended — requires
+**Mac / Linux / WSL2 / Git Bash**, does not run in native PowerShell):
 ```bash
 ./scripts/run_03A.sh 1985 1986 1987 1988
 ./scripts/run_03A.sh $(seq 1985 2024)
 ```
 
-**03B — subir a GEE** (editar `years_list` / `upload_outputs` en el script primero):
+**03B — upload to GEE** (edit `years_list` / `upload_outputs` in the script first):
 
 Mac / Linux / WSL2:
 ```bash
@@ -193,21 +198,21 @@ docker run --rm -v "${PWD}:/work" degradacion-r-steps 03B_uploadToGEE.R
 ```
 03C_patchID_patchSize_formatAsset.js   → GEE Code Editor → Run → Tasks
 ```
-Salidas: `results/03A/fragment_id_YYYY.tif` + `fragment_area_YYYY.tif` (local
-y GCS `results_03A/`); GEE `03_patch-id/`, `03_patch-size-all/`, y tras
+Output: `results/03A/fragment_id_YYYY.tif` + `fragment_area_YYYY.tif` (local
+and GCS `results_03A/`); GEE `03_patch-id/`, `03_patch-size-all/`, and after
 03C: `public/degradation_patch_id_col3_v1` / `..._patch_size_col3_v1`.
 
-### 04 — Morfología / MSPA (Docker + GEE)
+### 04 — Morphology / MSPA (Docker + GEE)
 
-**04A — GRASS, por región** (wrapper con watchdog de disco, recomendado —
-requiere **Mac / Linux / WSL2 / Git Bash**, no corre en PowerShell nativo):
+**04A — GRASS, per region** (wrapper with disk watchdog, recommended —
+requires **Mac / Linux / WSL2 / Git Bash**, does not run in native PowerShell):
 ```bash
 ./scripts/run_morph.sh 1985
-./scripts/run_morph.sh 1985 1986 1987      # secuencial, misma región
+./scripts/run_morph.sh 1985 1986 1987      # sequential, same region
 ```
 
-**04A — directo, sin watchdog** (cualquier sistema, pero en Windows hay que
-vigilar manualmente que `grassdata/` no crezca demasiado):
+**04A — direct, no watchdog** (any system, but on Windows you have to
+manually watch that `grassdata/` doesn't grow too large):
 
 Mac / Linux / WSL2:
 ```bash
@@ -218,7 +223,7 @@ Windows (PowerShell):
 docker run --rm -v "${PWD}:/work" degradacion-r-steps 04A_fragmentation_morphology.R 30471 1985
 ```
 
-**04B — subir a GEE:**
+**04B — upload to GEE:**
 
 Mac / Linux / WSL2:
 ```bash
@@ -233,35 +238,35 @@ docker run --rm -v "${PWD}:/work" degradacion-r-steps 04B_morphology_uploadToGEE
 ```
 04C_morphology_formatAsset.js   → GEE Code Editor → Run → Tasks
 ```
-Editar `region_id_default` (04A) / `REGION=` (`run_morph.sh`) para procesar
-otra región. Salidas: `results/04A/morphology_YYYY_RRRR.tif` (valores de
-píxel 0–6 — clases MSPA, ver el encabezado de `04A_fragmentation_morphology.R`
-para el significado de cada una); GEE `04_morphology/` y, tras 04C,
-`public/degradation_morphology_col3_v1`.
+Edit `region_id_default` (04A) / `REGION=` (`run_morph.sh`) to process
+another region. Output: `results/04A/morphology_YYYY_RRRR.tif` (pixel
+values 0–6 — MSPA classes, see the header of
+`04A_fragmentation_morphology.R` for the meaning of each one); GEE
+`04_morphology/` and, after 04C, `public/degradation_morphology_col3_v1`.
 
-### 05 — Aislamiento (GEE)
+### 05 — Isolation (GEE)
 ```
-05A_fragmentation_isolation_stepA.js   → reproyecta la máscara nativa a 100 m
-05B_fragmentation_isolation_stepB.js   → connectedPixelCount() = tamaño de parche
-05C_fragmentation_isolation_stepC.js   → distancia euclidiana a bloques fuente
-05D_fragmentation_isolation_stepD_v2.js → cruza tamaño + distancia + tamaño de fuente → código 1–10
+05A_fragmentation_isolation_stepA.js   → reprojects the native mask to 100 m
+05B_fragmentation_isolation_stepB.js   → connectedPixelCount() = patch size
+05C_fragmentation_isolation_stepC.js   → Euclidean distance to source blocks
+05D_fragmentation_isolation_stepD_v2.js → combines size + distance + source size → code 1–10
 ```
-Correr en orden estricto (05A → 05B → 05C → 05D), cada uno espera el asset de
-salida del anterior. Salidas finales:
+Run in strict order (05A → 05B → 05C → 05D), each one waits for the
+output asset of the previous one. Final outputs:
 `public/degradation_isolation_{100,500,1000}ha_col{N}_v{V}`.
 
-### 06 — Vegetación secundaria (GEE)
+### 06 — Secondary vegetation (GEE)
 ```
 06_secondaryVegetation_age.js
 ```
-Asset y códigos de clase confirmados: `asset` apunta a
+Asset and class codes confirmed: `asset` points to
 `DEFORESTATION/deforestation-secondary-vegetation-ft`, `secondary_classes = [3, 5]`.
 
 ---
 
-## Utilidades
+## Utilities
 
-**Borrar archivos en GCS** (con confirmación interactiva — requiere Mac /
+**Delete files on GCS** (with interactive confirmation — requires Mac /
 Linux / WSL2 / Git Bash):
 ```bash
 ./scripts/gcs_delete.sh gs://mbcolombia-degradacion/AUXILIARES/DEGRADACION/COL_3/results_04A/30471/
@@ -269,29 +274,29 @@ Linux / WSL2 / Git Bash):
 
 ---
 
-## Estructura de archivos
+## File structure
 
 ```
 colombia-degradation/
-  key.json                          ← service account Docker (no commitear)
+  key.json                          ← Docker service account (do not commit)
   gis/
-    region_vector_buffer.geojson    ← 155 regiones (id_regionC)
+    region_vector_buffer.geojson    ← 155 regions (id_regionC)
   tif/
-    nativeMask-classification_YYYY.tif   ← descargado de GCS por 03A/04A
+    nativeMask-classification_YYYY.tif   ← downloaded from GCS by 03A/04A
   results/
     03A/   fragment_id_YYYY.tif · fragment_area_YYYY.tif
     04A/   morphology_YYYY_RRRR.tif
   logs/
-    YYYY.log                        ← 03A (un archivo por año)
-    RRRR_YYYY_morphology.log        ← 04A (región + año)
-  manifests/                        ← JSONs de ingesta GEE (03B / 04B)
-  grassdata/                        ← scratch de GRASS (se borra automáticamente)
+    YYYY.log                        ← 03A (one file per year)
+    RRRR_YYYY_morphology.log        ← 04A (region + year)
+  manifests/                        ← GEE ingestion JSONs (03B / 04B)
+  grassdata/                        ← GRASS scratch space (deleted automatically)
   scripts/
-    run_03A.sh                      ← pool paralelo para 03A (N años a la vez)
-    run_morph.sh                    ← wrapper Docker + watchdog para 04A
-    gcs_delete.sh                   ← utilidad para borrar archivos en GCS
+    run_03A.sh                      ← parallel pool for 03A (N years at a time)
+    run_morph.sh                    ← Docker wrapper + watchdog for 04A
+    gcs_delete.sh                   ← utility to delete files on GCS
   docker/
-    README.md                       ← detalle completo Docker (build, service account, RStudio)
-    grass-r/                        ← Dockerfile de la imagen degradacion-r-steps
-  PIPELINE.md                       ← diagrama de flujo + tabla de scripts/estado
+    README.md                       ← full Docker details (build, service account, RStudio)
+    grass-r/                        ← Dockerfile for the degradacion-r-steps image
+  PIPELINE.md                       ← flow diagram + script/status table
 ```
