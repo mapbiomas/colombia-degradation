@@ -19,18 +19,16 @@
 # Fecha: 2026-07
 # =============================================================
 
-region_id_default <- 30471
+region_id_default <- 30210
 
 years_list <- c(
-  # 1985
-  # ,1986,
-  1987,1988,1989,1990,1991,1992,1993,1994,1995,
-  1996,1997,1998,1999,
-  2000,2001,2002,2003,2004,2005,2006,
-  2007,2008,2009,2010,2011,2012,2013,
-  2014,2015,2016,2017,2018,2019,2020,
-  2021,2022
-  # ,2023,2024
+  1985
+  # ,1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,
+  # 1996,1997,1998,1999,
+  # 2000,2001,2002,2003,2004,2005,2006,
+  # 2007,2008,2009,2010,2011,2012,2013,
+  # 2014,2015,2016,2017,2018,2019,2020,
+  # 2021,2022,2023,2024
 )
 
 args      <- commandArgs(trailingOnly = TRUE)
@@ -55,7 +53,7 @@ if (file.exists(gcs_key_file)) {
     key_file = normalizePath(gcs_key_file)
   )
   ee$Initialize(credentials = credentials, project = "mapbiomas-colombia")
-
+  
   # Autentica GCS con la misma service account. En Docker esto lo cubría
   # `gcloud auth activate-service-account` en entrypoint.sh — fuera de
   # Docker no hay ese paso previo, así que se hace aquí directamente.
@@ -79,8 +77,12 @@ manifest_dir <- "./manifests"
 dir.create(manifest_dir, showWarnings = FALSE)
 
 pyr_policy   <- "MODE"
-nodata_value <- 0
-overwrite    <- FALSE
+# 255 = el NoData real que graba r.out.gdal para los pixeles fuera del
+# poligono de la region (ver r.mask, Paso 5). NO usar 0 — 0 es una clase
+# valida de la clasificacion ("Sin vegetacion nativa"), no dato faltante;
+# declarar 0 como nodata hace que GEE oculte ~1/3 del raster.
+nodata_value <- 255
+overwrite    <- TRUE
 batch_size   <- 50
 
 cat("Región:", region_id, "| Años:", paste(years, collapse = " "), "\n")
@@ -110,10 +112,15 @@ gcs_exists <- function(uri) {
   }, error = function(e) FALSE)
 }
 
-upload_if_needed <- function(local_path, uri) {
-  if (gcs_exists(uri)) {
+upload_if_needed <- function(local_path, uri, force = FALSE) {
+  if (!force && gcs_exists(uri)) {
     cat("✓ Ya en GCS:", uri, "\n")
     return(invisible(NULL))
+  }
+  if (force && gcs_exists(uri)) {
+    p <- gcs_bucket_and_object(uri)
+    gcs_delete_object(p$object, bucket = p$bucket)
+    cat("✗ Borrado objeto GCS existente:", uri, "\n")
   }
   cat("↑ Subiendo a GCS:", uri, "\n")
   p <- gcs_bucket_and_object(uri)
@@ -138,24 +145,32 @@ build_manifest <- function(asset_id, uri, year) {
 manifest_paths <- c()
 
 for (year in years) {
-
+  
   tif_name  <- paste0("morphology_", year, "_", region_id, ".tif")
   tif_path  <- file.path(tif_dir, tif_name)
   asset_nm  <- tools::file_path_sans_ext(tif_name)
   asset_id  <- paste0(collection_id, "/", asset_nm)
   gcs_uri   <- paste0("gs://", bucket_name, "/", gcs_prefix, "/", tif_name)
-
+  
   cat("-----------------------------\n")
   cat("Año:", year, "| TIF:", tif_name, "\n")
-
-  if (asset_exists(asset_id) && !overwrite) {
-    cat("✓ Asset GEE ya existe, omitiendo:", asset_id, "\n")
-    next
+  
+  if (asset_exists(asset_id)) {
+    if (!overwrite) {
+      cat("✓ Asset GEE ya existe, omitiendo:", asset_id, "\n")
+      next
+    }
+    cat("✗ Asset GEE ya existe, borrando para reemplazar:", asset_id, "\n")
+    ee$data$deleteAsset(asset_id)
   }
 
   # El TIF debe estar en GCS (04A lo sube). Si también existe localmente,
-  # lo sube como respaldo por si 04A no completó la subida.
-  if (!gcs_exists(gcs_uri)) {
+  # lo sube como respaldo por si 04A no completó la subida. Con
+  # overwrite=TRUE se fuerza a resubir la version local (por si 04A generó
+  # una corrida nueva y GCS todavia tiene la version vieja).
+  if (overwrite && file.exists(tif_path)) {
+    upload_if_needed(tif_path, gcs_uri, force = TRUE)
+  } else if (!gcs_exists(gcs_uri)) {
     if (file.exists(tif_path)) {
       upload_if_needed(tif_path, gcs_uri)
     } else {
@@ -165,7 +180,7 @@ for (year in years) {
   } else {
     cat("✓ Ya en GCS:", gcs_uri, "\n")
   }
-
+  
   manifest      <- build_manifest(asset_id, gcs_uri, year)
   manifest_file <- file.path(manifest_dir, paste0(tif_name, ".json"))
   write_json(manifest, manifest_file, auto_unbox = TRUE, pretty = TRUE)
