@@ -534,7 +534,10 @@ process_year <- function(year, region_id, region_sf) {
     log_step("MORPH_BC_GROW", {
       if (!grass_has_raster(r_bcid_d)) {
         log_message("  aux_grow/r.grow.distance en curso (puede tardar varios minutos)...")
-        aux_grow(r_bcid, r_bcid_d, metric = "maximum")
+        # metric="maximum" truncaba la distancia a 0 en este CRS geografico,
+        # dejando el crecimiento sin limite real. radius=1.42 con euclidean
+        # cubre tambien las diagonales (sqrt(2)).
+        aux_grow(r_bcid, r_bcid_d, radius = 1.42, metric = "euclidean")
         execGRASS("r.mapcalc", flags = c("overwrite", "quiet"),
                   parameters = list(expression =
                     paste0(r_bcid_d, " = int(", r_bcid_d, ")")))
